@@ -1,74 +1,95 @@
-import { getAllRoutes } from '../services/mapservice.js';
-import Fleet from '../models/fleetmodel.js';
+import Request from "../models/requestmodel.js";
+import { getAllRoutes } from "../services/mapservice.js";
 
-export const getRoutes = async (req, res) => {
+export const registerVehicle = async (req, res) => {
   try {
-    const { origin, destination, vehicles } = req.body;
+    const {
+      vehicleId,
+      vehicleType,
+      currentLocation,
+      destination,
+      engineVehicle,
+      evVehicle,
+    } = req.body;
 
-    if (!origin || !destination || !vehicles || !vehicles.length) {
+    if (!vehicleId || !vehicleType || !currentLocation || !destination) {
       return res.status(400).json({
         success: false,
-        message: 'origin, destination and vehicles array are required',
+        message:
+          "vehicleId, vehicleType, currentLocation and destination are required",
       });
     }
 
-    const processedVehicles = [];
-
-    for (const vehicle of vehicles) {
-      const { vehicleId, vehicleType, mileageKmpl, evRange } = vehicle;
-
-      const routes = await getAllRoutes(origin, destination, mileageKmpl || 1, evRange || 0);
-
-      const bestRoute = routes.reduce((min, route) => {
-        return route.distanceKm / (mileageKmpl || 1) < min.distanceKm / (mileageKmpl || 1) ? route : min;
-      });
-
-      processedVehicles.push({
-        vehicleId,
-        vehicleType,
-        mileageKmpl: mileageKmpl || null,
-        evRange: evRange || null,
-        distanceKm: bestRoute.distanceKm,
-        duration: bestRoute.duration,
-        fuelConsumedLitres: bestRoute.engineVehicle.fuelConsumedLitres,
-        co2EmittedKg: vehicleType === 'ev' ? 0 : bestRoute.engineVehicle.co2EmittedKg,
-        isSufficient: vehicleType === 'ev' ? bestRoute.evVehicle.isSufficient : true,
-        geometry: bestRoute.geometry,
+    if (vehicleType === "ev" && !evVehicle?.distanceRange) {
+      return res.status(400).json({
+        success: false,
+        message: "evVehicle.distanceRange is required for EV vehicles",
       });
     }
 
-    const totalCo2 = parseFloat(processedVehicles.reduce((sum, v) => sum + v.co2EmittedKg, 0).toFixed(2));
-    const totalFuel = parseFloat(processedVehicles.reduce((sum, v) => sum + v.fuelConsumedLitres, 0).toFixed(2));
-    const avgCo2 = parseFloat((totalCo2 / processedVehicles.length).toFixed(2));
-    const totalTrees = parseFloat((totalCo2 / 21).toFixed(1));
+    if (
+      (vehicleType === "petrol" || vehicleType === "diesel") &&
+      !engineVehicle?.mileage
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "engineVehicle.mileage is required for petrol/diesel vehicles",
+      });
+    }
 
-    const fleet = await Fleet.create({
-      currentLocation: {
-        lat: processedVehicles[0].geometry.coordinates[0][1],
-        lng: processedVehicles[0].geometry.coordinates[0][0],
-        address: origin,
-      },
-      destination: {
-        lat: processedVehicles[0].geometry.coordinates.at(-1)[1],
-        lng: processedVehicles[0].geometry.coordinates.at(-1)[0],
-        address: destination,
-      },
-      totalVehicles: processedVehicles.length,
-      vehicles: processedVehicles,
-      fleetSummary: {
-        totalCo2EmittedKg: totalCo2,
-        totalFuelConsumedLitres: totalFuel,
-        avgCo2PerVehicleKg: avgCo2,
-        totalTreesEquivalent: totalTrees,
-      },
+    const vehicle = await Request.create({
+      vehicleId,
+      vehicleType,
+      currentLocation,
+      destination,
+      engineVehicle: vehicleType !== "ev" ? engineVehicle : undefined,
+      evVehicle: vehicleType === "ev" ? evVehicle : undefined,
     });
 
-    return res.status(200).json({
+    const mileageKmpl = engineVehicle?.mileage || 1;
+    const evRange = evVehicle?.distanceRange || 0;
+
+
+    const originCoords = {
+      lat: vehicle.currentLocation.lat,
+      lng: vehicle.currentLocation.lng,
+    };
+
+    const destCoords = {
+      lat: vehicle.destination.lat,
+      lng: vehicle.destination.lng,
+    };
+
+    
+    const routes = await getAllRoutes(
+      originCoords,
+      destCoords,
+      mileageKmpl,
+      evRange
+    );
+
+    // Find best route
+    const bestRoute = routes.reduce((min, route) => {
+      return route.distanceKm / mileageKmpl < min.distanceKm / mileageKmpl
+        ? route
+        : min;
+    });
+
+    return res.status(201).json({
       success: true,
-      fleet,
+      message: "Vehicle registered and routes calculated",
+      vehicle,
+      totalRoutes: routes.length,
+      bestRoute,
     });
-
   } catch (error) {
+    if (error.code === 11000) {
+      return res.status(409).json({
+        success: false,
+        message: `Vehicle with id ${req.body.vehicleId} already exists`,
+      });
+    }
+
     return res.status(500).json({
       success: false,
       message: error.message,

@@ -1,8 +1,8 @@
 import express from 'express';
-import { getRoutes } from '../controllers/mapController.js';
+import { registerVehicle } from '../controllers/mapcontrollers.js';
 
 const router = express.Router();
 
-router.post('/routes', getRoutes);
+router.post('/register', registerVehicle);
 
 export default router;

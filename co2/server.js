@@ -2,7 +2,7 @@ import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import connectDB from './db.js';
-import mapRoutes from './routes/maproutes.js';
+import maproutes from './routes/maproutes.js';
 
 dotenv.config();
 
@@ -13,7 +13,7 @@ app.use(express.json());
 
 connectDB();
 
-app.use('/api/map', mapRoutes);
+app.use('/api/map', maproutes);
 
 const PORT = process.env.PORT || 8000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
