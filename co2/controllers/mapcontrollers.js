@@ -1,5 +1,6 @@
 import Request from "../models/requestmodel.js";
 import { getAllRoutes } from "../services/mapservice.js";
+import Fleet from "../models/fleetmodel.js";
 
 export const registerVehicle = async (req, res) => {
   try {
@@ -70,10 +71,56 @@ export const registerVehicle = async (req, res) => {
 
     // Find best route
     const bestRoute = routes.reduce((min, route) => {
-      return route.distanceKm / mileageKmpl < min.distanceKm / mileageKmpl
+      return (route.distanceKm / mileageKmpl) * 2.31 < (min.distanceKm / mileageKmpl) * 2.31
         ? route
         : min;
     });
+
+    const fleet = await Fleet.create({
+  vehicleId: vehicle.vehicleId,
+  vehicleType: vehicle.vehicleType,
+
+  currentLocation: {
+    address: vehicle.currentLocation.address,
+    lat: vehicle.currentLocation.lat,
+    lng: vehicle.currentLocation.lng,
+  },
+
+  destination: {
+    address: vehicle.destination.address,
+    lat: vehicle.destination.lat,
+    lng: vehicle.destination.lng,
+  },
+
+  totalRoutes: routes.totalRoutes,
+
+  bestRoute: {
+    routeIndex: bestRoute.routeIndex,
+    distanceKm: bestRoute.distanceKm,
+    duration: bestRoute.duration,
+    durationSeconds: bestRoute.durationSeconds,
+
+    geometry: bestRoute.geometry,
+
+    engineVehicle: {
+      mileageKmpl: bestRoute.engineVehicle.mileageKmpl,
+      fuelConsumedLitres: bestRoute.engineVehicle.fuelConsumedLitres,
+      co2EmittedKg: bestRoute.engineVehicle.co2EmittedKg,
+    },
+
+    evVehicle: {
+      totalRangeKm: bestRoute.evVehicle.totalRangeKm,
+      rangeAfterTrip: bestRoute.evVehicle.rangeAfterTrip,
+      co2EmittedKg: bestRoute.evVehicle.co2EmittedKg,
+      isSufficient: bestRoute.evVehicle.isSufficient,
+    },
+
+    comparison: {
+      co2SavedKg: bestRoute.comparison.co2SavedKg,
+      treesEquivalent: bestRoute.comparison.treesEquivalent,
+    },
+  },
+});
 
     return res.status(201).json({
       success: true,

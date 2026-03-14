@@ -1,46 +1,61 @@
-import mongoose from 'mongoose';
+import mongoose from "mongoose";
 
-const vehicleRouteSchema = new mongoose.Schema({
-  vehicleId: { type: String, required: true },
-  vehicleType: { type: String, enum: ['engine', 'ev'], required: true },
+const coordinateSchema = new mongoose.Schema({
+  address: { type: String, required: true },
+  lat: { type: Number, required: true },
+  lng: { type: Number, required: true },
+});
+
+const engineVehicleSchema = new mongoose.Schema({
   mileageKmpl: { type: Number },
-  evRange: { type: Number },
-  distanceKm: { type: Number, required: true },
-  duration: { type: String, required: true },
-  fuelConsumedLitres: { type: Number, default: 0 },
-  co2EmittedKg: { type: Number, required: true },
+  fuelConsumedLitres: { type: Number },
+  co2EmittedKg: { type: Number },
+});
+
+const evVehicleSchema = new mongoose.Schema({
+  totalRangeKm: { type: Number },
+  rangeAfterTrip: { type: Number },
+  co2EmittedKg: { type: Number },
   isSufficient: { type: Boolean },
-  geometry: { type: Object },
+});
+
+const comparisonSchema = new mongoose.Schema({
+  co2SavedKg: { type: Number },
+  treesEquivalent: { type: Number },
+});
+
+const geometrySchema = new mongoose.Schema({
+  type: { type: String, default: "LineString" },
+  coordinates: [[Number]], // [lng, lat]
+});
+
+const routeSchema = new mongoose.Schema({
+  routeIndex: { type: Number },
+  distanceKm: { type: Number },
+  duration: { type: String },
+  durationSeconds: { type: Number },
+  geometry: geometrySchema,
+  engineVehicle: engineVehicleSchema,
+  evVehicle: evVehicleSchema,
+  comparison: comparisonSchema,
 });
 
 const fleetSchema = new mongoose.Schema(
   {
-    currentLocation: {
-      lat: { type: Number, required: true },
-      lng: { type: Number, required: true },
-      address: { type: String, required: true },
-    },
+    vehicleId: { type: String, required: true },
+    vehicleType: { type: String, required: true },
 
-    destination: {
-      lat: { type: Number, required: true },
-      lng: { type: Number, required: true },
-      address: { type: String, required: true },
-    },
+    currentLocation: coordinateSchema,
+    destination: coordinateSchema,
 
-    totalVehicles: { type: Number, required: true },
+    routes: [routeSchema],
 
-    vehicles: [vehicleRouteSchema],
-
-    fleetSummary: {
-      totalCo2EmittedKg: { type: Number, required: true },
-      totalFuelConsumedLitres: { type: Number, required: true },
-      avgCo2PerVehicleKg: { type: Number, required: true },
-      totalTreesEquivalent: { type: Number },
-    },
+    totalRoutes: { type: Number },
+    bestRoute: routeSchema,
   },
   { timestamps: true }
 );
 
-const Fleet = mongoose.model('Fleet', fleetSchema);
+const Fleet = mongoose.model("Fleet", fleetSchema);
 
 export default Fleet;
